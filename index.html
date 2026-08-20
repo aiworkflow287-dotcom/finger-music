@@ -1,0 +1,1683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>FingerSound — Hand Controlled Music</title>
+
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
+<style>
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg: #f5f5f2;
+    --text: #111;
+    --muted: #777;
+    --line: #d7d7d1;
+}
+
+body {
+    font-family:
+        Inter,
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    background: var(--bg);
+    color: var(--text);
+
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* ==============================
+HEADER
+============================== */
+
+header {
+    height: 70px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    padding: 0 28px;
+
+    border-bottom: 1px solid var(--line);
+}
+
+.logo {
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: -0.06em;
+}
+
+.logo span {
+    font-weight: 300;
+}
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+
+    border-radius: 50%;
+
+    background: #aaa;
+}
+
+.status-dot.active {
+    background: #20b65b;
+}
+
+/* ==============================
+MAIN
+============================== */
+
+main {
+    padding: 25px;
+}
+
+/* ==============================
+CONTROLS
+============================== */
+
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    margin-bottom: 25px;
+}
+
+.control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    padding: 8px 11px;
+
+    border: 1px solid var(--line);
+    border-radius: 7px;
+
+    background: rgba(255,255,255,.5);
+
+    font-size: 12px;
+}
+
+.control label {
+    color: var(--muted);
+}
+
+select {
+    border: 0;
+    outline: 0;
+
+    background: transparent;
+
+    cursor: pointer;
+}
+
+button {
+    border: 1px solid var(--line);
+
+    background: white;
+
+    border-radius: 7px;
+
+    padding: 8px 13px;
+
+    cursor: pointer;
+
+    transition: .15s;
+}
+
+button:hover {
+    background: #e9e9e5;
+}
+
+button:active {
+    transform: scale(.96);
+}
+
+/* ==============================
+TITLE
+============================== */
+
+.hero {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-end;
+
+    margin-bottom: 25px;
+}
+
+.hero h1 {
+    font-size: clamp(60px, 10vw, 150px);
+
+    font-weight: 500;
+
+    letter-spacing: -.09em;
+
+    line-height: .8;
+}
+
+.hero p {
+    max-width: 350px;
+
+    color: var(--muted);
+
+    font-size: 13px;
+
+    line-height: 1.5;
+}
+
+/* ==============================
+CAMERA
+============================== */
+
+.camera-area {
+    position: relative;
+
+    width: 100%;
+
+    height: 430px;
+
+    background: #111;
+
+    border-radius: 12px;
+
+    overflow: hidden;
+
+    margin-bottom: 20px;
+}
+
+#cameraVideo {
+    position: absolute;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+    transform: scaleX(-1);
+
+    opacity: .88;
+}
+
+#handCanvas {
+    position: absolute;
+
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    pointer-events: none;
+}
+
+/* ==============================
+INSTRUCTIONS
+============================== */
+
+.camera-info {
+    position: absolute;
+
+    left: 20px;
+    top: 20px;
+
+    padding: 10px 13px;
+
+    background: rgba(0,0,0,.65);
+
+    color: white;
+
+    border-radius: 7px;
+
+    font-size: 12px;
+
+    z-index: 5;
+}
+
+.camera-info strong {
+    display: block;
+
+    margin-bottom: 4px;
+}
+
+/* ==============================
+FINGER POINTER
+============================== */
+
+.pointer {
+    position: absolute;
+
+    width: 30px;
+    height: 30px;
+
+    border: 3px solid white;
+
+    border-radius: 50%;
+
+    transform:
+        translate(-50%, -50%);
+
+    pointer-events: none;
+
+    z-index: 10;
+
+    display: none;
+
+    box-shadow:
+        0 0 0 5px rgba(255,255,255,.2);
+}
+
+.pointer.active {
+    display: block;
+}
+
+/* ==============================
+PIANO
+============================== */
+
+.instrument {
+    border: 1px solid var(--line);
+
+    border-radius: 12px;
+
+    padding: 15px;
+
+    background: rgba(255,255,255,.3);
+}
+
+.instrument-header {
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin-bottom: 12px;
+
+    font-size: 12px;
+}
+
+.instrument-header span:last-child {
+    color: var(--muted);
+}
+
+.keys {
+    display: grid;
+
+    grid-template-columns:
+        repeat(14, 1fr);
+
+    gap: 5px;
+
+    height: 260px;
+}
+
+.key {
+    position: relative;
+
+    display: flex;
+
+    align-items: flex-end;
+
+    justify-content: center;
+
+    padding-bottom: 14px;
+
+    background: #fafaf8;
+
+    border: 1px solid #d0d0ca;
+
+    border-radius: 7px;
+
+    transition:
+        transform .08s,
+        background .08s;
+}
+
+.key span {
+    color: #888;
+
+    font-size: 11px;
+}
+
+.key small {
+    position: absolute;
+
+    top: 10px;
+
+    color: #aaa;
+
+    font-size: 9px;
+}
+
+.key.active {
+    background: #111;
+
+    color: white;
+
+    transform: translateY(5px);
+}
+
+.key.active span,
+.key.active small {
+    color: white;
+}
+
+/* ==============================
+VISUALIZER
+============================== */
+
+.visualizer {
+    height: 100px;
+
+    margin: 20px 0;
+
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+}
+
+#visualizer {
+    width: 100%;
+    height: 100%;
+}
+
+/* ==============================
+FOOTER
+============================== */
+
+footer {
+    display: flex;
+
+    justify-content: space-between;
+
+    padding-top: 20px;
+
+    color: var(--muted);
+
+    font-size: 11px;
+}
+
+/* ==============================
+MOBILE
+============================== */
+
+@media(max-width:700px) {
+
+    main {
+        padding: 15px;
+    }
+
+    header {
+        padding: 0 15px;
+    }
+
+    .hero {
+        display: block;
+    }
+
+    .hero h1 {
+        font-size: 70px;
+
+        margin-bottom: 20px;
+    }
+
+    .camera-area {
+        height: 350px;
+    }
+
+    .keys {
+        grid-template-columns:
+            repeat(7, 1fr);
+
+        height: 240px;
+    }
+
+}
+
+</style>
+</head>
+
+
+<body>
+
+<header>
+
+    <div class="logo">
+        finger<span>sound</span>
+    </div>
+
+    <div class="status">
+
+        <div
+            id="statusDot"
+            class="status-dot">
+        </div>
+
+        <span id="statusText">
+            camera off
+        </span>
+
+    </div>
+
+</header>
+
+
+<main>
+
+<!-- ==========================
+CONTROLS
+========================== -->
+
+<section class="controls">
+
+    <div class="control">
+
+        <label>Scale</label>
+
+        <select id="scale">
+
+            <option value="major">
+                C Major
+            </option>
+
+            <option value="minor">
+                C Minor
+            </option>
+
+            <option value="pentatonic">
+                C Pentatonic
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <div class="control">
+
+        <label>Wave</label>
+
+        <select id="wave">
+
+            <option value="sine">
+                Sine
+            </option>
+
+            <option value="triangle">
+                Triangle
+            </option>
+
+            <option value="square">
+                Square
+            </option>
+
+            <option value="sawtooth">
+                Sawtooth
+            </option>
+
+        </select>
+
+    </div>
+
+
+    <div class="control">
+
+        <label>Volume</label>
+
+        <input
+            id="volume"
+            type="range"
+            min="0"
+            max="1"
+            value=".25"
+            step=".01">
+
+    </div>
+
+
+    <button id="startButton">
+        Start Camera
+    </button>
+
+
+    <button id="stopButton">
+        Stop
+
+    </button>
+
+</section>
+
+
+<!-- ==========================
+TITLE
+========================== -->
+
+<section class="hero">
+
+    <h1>
+        finger<br>
+        sound
+    </h1>
+
+    <p>
+
+        Move your index finger
+        across the camera view.
+
+        Each zone becomes a
+        musical note.
+
+        No touching required.
+
+    </p>
+
+</section>
+
+
+<!-- ==========================
+CAMERA
+========================== -->
+
+<section class="camera-area">
+
+    <video
+        id="cameraVideo"
+        autoplay
+        muted
+        playsinline>
+    </video>
+
+
+    <canvas
+        id="handCanvas">
+    </canvas>
+
+
+    <div class="camera-info">
+
+        <strong>
+            🖐 Hand Instrument
+        </strong>
+
+        Move your index finger
+        left and right.
+
+    </div>
+
+
+    <div
+        id="fingerPointer"
+        class="pointer">
+    </div>
+
+</section>
+
+
+<!-- ==========================
+VISUALIZER
+========================== -->
+
+<section class="visualizer">
+
+    <canvas
+        id="visualizer">
+    </canvas>
+
+</section>
+
+
+<!-- ==========================
+PIANO
+========================== -->
+
+<section class="instrument">
+
+    <div class="instrument-header">
+
+        <span>
+            VIRTUAL PIANO
+        </span>
+
+        <span>
+            Finger zones
+        </span>
+
+    </div>
+
+
+    <div
+        id="keys"
+        class="keys">
+    </div>
+
+</section>
+
+
+<footer>
+
+    <span>
+        FingerSound
+    </span>
+
+    <span>
+        MediaPipe + Web Audio
+    </span>
+
+</footer>
+
+</main>
+
+
+<script>
+
+/* =========================================================
+AUDIO
+========================================================= */
+
+let audioContext = null;
+
+let masterGain = null;
+
+let analyser = null;
+
+let currentOscillator = null;
+
+let currentGain = null;
+
+let currentKey = -1;
+
+
+function initAudio() {
+
+    if (audioContext)
+        return;
+
+    audioContext =
+        new (
+            window.AudioContext ||
+            window.webkitAudioContext
+        )();
+
+
+    masterGain =
+        audioContext.createGain();
+
+
+    analyser =
+        audioContext.createAnalyser();
+
+
+    analyser.fftSize = 512;
+
+
+    masterGain.gain.value =
+        Number(
+            document.getElementById(
+                "volume"
+            ).value
+        );
+
+
+    masterGain.connect(
+        analyser
+    );
+
+    analyser.connect(
+        audioContext.destination
+    );
+
+}
+
+
+/* =========================================================
+SCALE
+========================================================= */
+
+const scales = {
+
+    major:
+        [0,2,4,5,7,9,11],
+
+    minor:
+        [0,2,3,5,7,8,10],
+
+    pentatonic:
+        [0,2,4,7,9]
+
+};
+
+
+let selectedScale = "major";
+
+
+document
+    .getElementById("scale")
+    .addEventListener(
+        "change",
+        e => {
+
+            selectedScale =
+                e.target.value;
+
+        }
+    );
+
+
+/* =========================================================
+FREQUENCY
+========================================================= */
+
+function getFrequency(index) {
+
+    const scale =
+        scales[selectedScale];
+
+
+    const octave =
+        Math.floor(
+            index / scale.length
+        );
+
+
+    const position =
+        index %
+        scale.length;
+
+
+    const semitone =
+        scale[position] +
+        octave * 12;
+
+
+    return 261.63 *
+        Math.pow(
+            2,
+            semitone / 12
+        );
+
+}
+
+
+/* =========================================================
+CREATE PIANO
+========================================================= */
+
+const keys =
+    document.getElementById(
+        "keys"
+    );
+
+
+const noteNames = [
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "A",
+    "B"
+];
+
+
+for (
+    let i = 0;
+    i < 14;
+    i++
+) {
+
+    const key =
+        document.createElement(
+            "div"
+        );
+
+
+    key.className = "key";
+
+
+    key.dataset.index =
+        i;
+
+
+    key.innerHTML = `
+
+        <small>
+            ${noteNames[
+                i % 7
+            ]}
+        </small>
+
+        <span>
+            ${i + 1}
+        </span>
+
+    `;
+
+
+    keys.appendChild(key);
+
+}
+
+
+/* =========================================================
+PLAY NOTE
+========================================================= */
+
+function playNote(index) {
+
+    initAudio();
+
+
+    if (
+        audioContext.state ===
+        "suspended"
+    ) {
+
+        audioContext.resume();
+
+    }
+
+
+    if (
+        currentKey === index
+    )
+        return;
+
+
+    stopNote();
+
+
+    currentKey = index;
+
+
+    const oscillator =
+        audioContext.createOscillator();
+
+
+    const gain =
+        audioContext.createGain();
+
+
+    oscillator.type =
+        document.getElementById(
+            "wave"
+        ).value;
+
+
+    oscillator.frequency.value =
+        getFrequency(index);
+
+
+    gain.gain.setValueAtTime(
+        0,
+        audioContext.currentTime
+    );
+
+
+    gain.gain.linearRampToValueAtTime(
+        .5,
+        audioContext.currentTime + .04
+    );
+
+
+    oscillator.connect(gain);
+
+    gain.connect(masterGain);
+
+
+    oscillator.start();
+
+
+    currentOscillator =
+        oscillator;
+
+    currentGain =
+        gain;
+
+
+    const key =
+        document.querySelector(
+            `.key[data-index="${index}"]`
+        );
+
+
+    if (key)
+        key.classList.add(
+            "active"
+        );
+
+
+    document.getElementById(
+        "statusText"
+    ).textContent =
+        "playing note";
+
+
+}
+
+
+/* =========================================================
+STOP NOTE
+========================================================= */
+
+function stopNote() {
+
+    if (
+        !currentOscillator
+    )
+        return;
+
+
+    const now =
+        audioContext.currentTime;
+
+
+    currentGain.gain.cancelScheduledValues(
+        now
+    );
+
+
+    currentGain.gain.setValueAtTime(
+        currentGain.gain.value,
+        now
+    );
+
+
+    currentGain.gain.linearRampToValueAtTime(
+        0,
+        now + .08
+    );
+
+
+    currentOscillator.stop(
+        now + .1
+    );
+
+
+    const key =
+        document.querySelector(
+            `.key[data-index="${currentKey}"]`
+        );
+
+
+    if (key)
+        key.classList.remove(
+            "active"
+        );
+
+
+    currentOscillator = null;
+
+    currentGain = null;
+
+    currentKey = -1;
+
+}
+
+
+/* =========================================================
+VOLUME
+========================================================= */
+
+document
+    .getElementById("volume")
+    .addEventListener(
+        "input",
+        e => {
+
+            if (masterGain) {
+
+                masterGain.gain.value =
+                    Number(
+                        e.target.value
+                    );
+
+            }
+
+        }
+    );
+
+
+/* =========================================================
+MEDIA PIPE
+========================================================= */
+
+const video =
+    document.getElementById(
+        "cameraVideo"
+    );
+
+
+const canvas =
+    document.getElementById(
+        "handCanvas"
+    );
+
+
+const ctx =
+    canvas.getContext("2d");
+
+
+const pointer =
+    document.getElementById(
+        "fingerPointer"
+    );
+
+
+let camera = null;
+
+
+/* =========================================================
+RESIZE CANVAS
+========================================================= */
+
+function resizeCanvas() {
+
+    canvas.width =
+        canvas.clientWidth;
+
+    canvas.height =
+        canvas.clientHeight;
+
+}
+
+
+window.addEventListener(
+    "resize",
+    resizeCanvas
+);
+
+resizeCanvas();
+
+
+/* =========================================================
+MEDIAPIPE HANDS
+========================================================= */
+
+const hands =
+    new Hands({
+
+        locateFile: file => {
+
+            return `
+https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}
+            `;
+
+        }
+
+    });
+
+
+hands.setOptions({
+
+    maxNumHands: 2,
+
+    modelComplexity: 1,
+
+    minDetectionConfidence: .6,
+
+    minTrackingConfidence: .6
+
+});
+
+
+hands.onResults(
+    onHandResults
+);
+
+
+/* =========================================================
+HAND RESULTS
+========================================================= */
+
+function onHandResults(
+    results
+) {
+
+    ctx.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+    );
+
+
+    if (
+        !results.multiHandLandmarks ||
+        results.multiHandLandmarks.length === 0
+    ) {
+
+        pointer.classList.remove(
+            "active"
+        );
+
+        stopNote();
+
+        document.getElementById(
+            "statusText"
+        ).textContent =
+            "searching for hand";
+
+        return;
+
+    }
+
+
+    document.getElementById(
+        "statusText"
+    ).textContent =
+        "hand detected";
+
+
+    /* ==========================
+    DRAW HANDS
+    ========================== */
+
+    for (
+        const landmarks of
+        results.multiHandLandmarks
+    ) {
+
+        drawConnectors(
+            ctx,
+            landmarks,
+            HAND_CONNECTIONS,
+            {
+                color: "#ffffff",
+                lineWidth: 2
+            }
+        );
+
+
+        drawLandmarks(
+            ctx,
+            landmarks,
+            {
+                color: "#ffffff",
+                lineWidth: 1,
+                radius: 3
+            }
+        );
+
+    }
+
+
+    /* ==========================
+    INDEX FINGER
+    ========================== */
+
+    const hand =
+        results.multiHandLandmarks[0];
+
+
+    const indexFinger =
+        hand[8];
+
+
+    /*
+        MediaPipe coordinates:
+
+        x = 0 → left
+        x = 1 → right
+        y = 0 → top
+        y = 1 → bottom
+    */
+
+
+    const x =
+        1 -
+        indexFinger.x;
+
+
+    const y =
+        indexFinger.y;
+
+
+    /* ==========================
+    POINTER
+    ========================== */
+
+    pointer.style.left =
+        `${x * 100}%`;
+
+
+    pointer.style.top =
+        `${y * 100}%`;
+
+
+    pointer.classList.add(
+        "active"
+    );
+
+
+    /* ==========================
+    VIRTUAL PIANO ZONES
+    ========================== */
+
+    let noteIndex =
+        Math.floor(
+            x * 14
+        );
+
+
+    noteIndex =
+        Math.max(
+            0,
+            Math.min(
+                13,
+                noteIndex
+            )
+        );
+
+
+    /*
+       Only play when finger
+       is inside the lower
+       playing area.
+    */
+
+    if (
+        y > .15 &&
+        y < .95
+    ) {
+
+        playNote(
+            noteIndex
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+START CAMERA
+========================================================= */
+
+document
+    .getElementById(
+        "startButton"
+    )
+    .addEventListener(
+        "click",
+        startCamera
+    );
+
+
+async function startCamera() {
+
+    try {
+
+        document.getElementById(
+            "statusText"
+        ).textContent =
+            "starting camera...";
+
+
+        initAudio();
+
+
+        camera =
+            new Camera(
+                video,
+                {
+
+                    onFrame:
+                        async () => {
+
+                            await hands.send({
+                                image:
+                                    video
+                            });
+
+                        },
+
+                    width: 1280,
+
+                    height: 720
+
+                }
+            );
+
+
+        await camera.start();
+
+
+        document.getElementById(
+            "statusDot"
+        ).classList.add(
+            "active"
+        );
+
+
+        document.getElementById(
+            "statusText"
+        ).textContent =
+            "camera active";
+
+
+    } catch (error) {
+
+        console.error(error);
+
+
+        document.getElementById(
+            "statusText"
+        ).textContent =
+            "camera permission denied";
+
+
+        alert(
+            "Please allow camera access and try again."
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+STOP CAMERA
+========================================================= */
+
+document
+    .getElementById(
+        "stopButton"
+    )
+    .addEventListener(
+        "click",
+        () => {
+
+            stopNote();
+
+
+            if (camera) {
+
+                camera.stop();
+
+                camera = null;
+
+            }
+
+
+            if (
+                video.srcObject
+            ) {
+
+                video.srcObject
+                    .getTracks()
+                    .forEach(
+                        track =>
+                            track.stop()
+                    );
+
+            }
+
+
+            pointer.classList.remove(
+                "active"
+            );
+
+
+            ctx.clearRect(
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+
+            document.getElementById(
+                "statusDot"
+            ).classList.remove(
+                "active"
+            );
+
+
+            document.getElementById(
+                "statusText"
+            ).textContent =
+                "camera off";
+
+        }
+    );
+
+
+/* =========================================================
+KEYBOARD BACKUP
+========================================================= */
+
+const keyboardMap = {
+
+    "a": 0,
+    "s": 1,
+    "d": 2,
+    "f": 3,
+    "g": 4,
+    "h": 5,
+    "j": 6,
+    "k": 7,
+    "l": 8,
+    "z": 9,
+    "x": 10,
+    "c": 11,
+    "v": 12,
+    "b": 13
+
+};
+
+
+document.addEventListener(
+    "keydown",
+    e => {
+
+        if (e.repeat)
+            return;
+
+
+        const index =
+            keyboardMap[
+                e.key.toLowerCase()
+            ];
+
+
+        if (
+            index === undefined
+        )
+            return;
+
+
+        playNote(index);
+
+    }
+);
+
+
+document.addEventListener(
+    "keyup",
+    e => {
+
+        if (
+            keyboardMap[
+                e.key.toLowerCase()
+            ] !== undefined
+        ) {
+
+            stopNote();
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+AUDIO VISUALIZER
+========================================================= */
+
+const visualizer =
+    document.getElementById(
+        "visualizer"
+    );
+
+
+const vctx =
+    visualizer.getContext(
+        "2d"
+    );
+
+
+function resizeVisualizer() {
+
+    visualizer.width =
+        visualizer.clientWidth;
+
+    visualizer.height =
+        visualizer.clientHeight;
+
+}
+
+
+resizeVisualizer();
+
+window.addEventListener(
+    "resize",
+    resizeVisualizer
+);
+
+
+function drawVisualizer() {
+
+    requestAnimationFrame(
+        drawVisualizer
+    );
+
+
+    const width =
+        visualizer.width;
+
+    const height =
+        visualizer.height;
+
+
+    vctx.clearRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+    if (!analyser) {
+
+        vctx.beginPath();
+
+        vctx.moveTo(
+            0,
+            height / 2
+        );
+
+
+        for (
+            let x = 0;
+            x < width;
+            x += 5
+        ) {
+
+            const y =
+                height / 2 +
+                Math.sin(
+                    x * .02
+                ) * 5;
+
+
+            vctx.lineTo(
+                x,
+                y
+            );
+
+        }
+
+
+        vctx.stroke();
+
+        return;
+
+    }
+
+
+    const data =
+        new Uint8Array(
+            analyser.frequencyBinCount
+        );
+
+
+    analyser.getByteFrequencyData(
+        data
+    );
+
+
+    const barWidth =
+        width /
+        data.length;
+
+
+    for (
+        let i = 0;
+        i < data.length;
+        i++
+    ) {
+
+        const value =
+            data[i] / 255;
+
+
+        const barHeight =
+            value * height;
+
+
+        vctx.fillRect(
+            i * barWidth,
+            height - barHeight,
+            Math.max(
+                1,
+                barWidth - 1
+            ),
+            barHeight
+        );
+
+    }
+
+}
+
+
+drawVisualizer();
+
+</script>
+
+</body>
+</html>
